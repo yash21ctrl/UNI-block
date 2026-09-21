@@ -1,7 +1,26 @@
 # RailBlock AI — Multi-Agent Corridor Operating System
 ### Smart India Hackathon 2026 | Problem Statement 26027
 
+[![Live Production](https://img.shields.io/badge/Production-Live%20on%20Vercel-059669?style=for-the-badge&logo=vercel)](https://railblock-ai-six.vercel.app)
+[![Next.js 15](https://img.shields.io/badge/Frontend-Next.js%2015%20React%2019-000000?style=for-the-badge&logo=nextdotjs)](https://railblock-ai-six.vercel.app)
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI%20Python-009688?style=for-the-badge&logo=fastapi)](https://railblock-ai-six.vercel.app)
+
 RailBlock AI is an enterprise, multi-agent, explainable, self-healing AI platform tailored for **Indian Railways**. It unifies maintenance inputs across **TMS** (Track Management System), **SMMS** (Signaling Maintenance Management System), **TDMS** (Traction Distribution Management System), and **COA** (Control Office Application) to automatically synthesize conflict-free, Pareto-optimized weekly and monthly block schedules.
+
+---
+
+## 🌐 Live Web Portals (Direct Access)
+
+All portals are deployed and operational 24/7 on Vercel:
+
+| Portal / Subsystem | Live Production URL | Key Operational Capabilities |
+| :--- | :--- | :--- |
+| 🎛️ **Section Controller Central Cockpit** | **[Open Cockpit](https://railblock-ai-six.vercel.app/cockpit)** | Pareto profile optimization, 6-agent multi-agent status, joint block fusion, live Gantt chart |
+| 🚉 **Station Master Operating Terminal** | **[Open Station Master Terminal](https://railblock-ai-six.vercel.app/station)** | Form T/351 Line Clear Disconnection Memos, station interlocking, physical QR verification |
+| 📱 **Field Junior Engineer Terminal** | **[Open Field JE Portal](https://railblock-ai-six.vercel.app/field/request)** | Requisition submission, track defect photo dossiers, dynamic QR possession token |
+| 🗺️ **Karnataka Digital Twin GIS** | **[Open Karnataka Twin GIS](https://railblock-ai-six.vercel.app/twin)** | 159 Karnataka stations, 12 corridors, live ISRO RTIS train telemetry, dual GIS engines |
+| ⚡ **Field Demands & Sanction Desk** | **[Open Demands Desk](https://railblock-ai-six.vercel.app/cockpit/requests)** | Section Controller review of pending requisitions, damage inspections & block allocation |
+| 🛡️ **SIL-4 Safety Audit Ledger** | **[Open Audit Ledger](https://railblock-ai-six.vercel.app/audit)** | Immutable audit records, zero-conflict certifications & SHAP explainability |
 
 ---
 
