@@ -1,0 +1,366 @@
+{
+  "generated_at": "2026-09-04T15:06:37.017646+00:00",
+  "sample_count": 10,
+  "data": [
+    {
+      "task_id": 101,
+      "score": 86.3,
+      "top_features": [
+        {
+          "feature": "safety_impact",
+          "shap_value": 12.68,
+          "direction": "INCREASES_URGENCY",
+          "value": 33.75
+        },
+        {
+          "feature": "traffic_density",
+          "shap_value": 3.62,
+          "direction": "INCREASES_URGENCY",
+          "value": 58.4
+        },
+        {
+          "feature": "severity",
+          "shap_value": 2.01,
+          "direction": "INCREASES_URGENCY",
+          "value": 5.0
+        },
+        {
+          "feature": "asset_criticality",
+          "shap_value": 1.94,
+          "direction": "INCREASES_URGENCY",
+          "value": 5.0
+        },
+        {
+          "feature": "log_overdue_days",
+          "shap_value": 0.62,
+          "direction": "INCREASES_URGENCY",
+          "value": 1.0986122886681098
+        }
+      ]
+    },
+    {
+      "task_id": 102,
+      "score": 79.5,
+      "top_features": [
+        {
+          "feature": "safety_impact",
+          "shap_value": 10.67,
+          "direction": "INCREASES_URGENCY",
+          "value": 27.0
+        },
+        {
+          "feature": "traffic_density",
+          "shap_value": 1.96,
+          "direction": "INCREASES_URGENCY",
+          "value": 52.0
+        },
+        {
+          "feature": "severity",
+          "shap_value": 1.88,
+          "direction": "INCREASES_URGENCY",
+          "value": 5.0
+        },
+        {
+          "feature": "log_overdue_days",
+          "shap_value": -0.72,
+          "direction": "DECREASES_URGENCY",
+          "value": 0.6931471805599453
+        },
+        {
+          "feature": "section_priority_tier",
+          "shap_value": 0.52,
+          "direction": "INCREASES_URGENCY",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "task_id": 103,
+      "score": 72.2,
+      "top_features": [
+        {
+          "feature": "safety_impact",
+          "shap_value": 3.41,
+          "direction": "INCREASES_URGENCY",
+          "value": 16.0
+        },
+        {
+          "feature": "severity",
+          "shap_value": 1.31,
+          "direction": "INCREASES_URGENCY",
+          "value": 4.0
+        },
+        {
+          "feature": "log_overdue_days",
+          "shap_value": 1.18,
+          "direction": "INCREASES_URGENCY",
+          "value": 1.0986122886681098
+        },
+        {
+          "feature": "section_priority_tier",
+          "shap_value": 0.59,
+          "direction": "INCREASES_URGENCY",
+          "value": 1.0
+        },
+        {
+          "feature": "traffic_density",
+          "shap_value": 0.5,
+          "direction": "INCREASES_URGENCY",
+          "value": 46.5
+        }
+      ]
+    },
+    {
+      "task_id": 104,
+      "score": 78.1,
+      "top_features": [
+        {
+          "feature": "safety_impact",
+          "shap_value": 9.21,
+          "direction": "INCREASES_URGENCY",
+          "value": 21.6
+        },
+        {
+          "feature": "severity",
+          "shap_value": 1.21,
+          "direction": "INCREASES_URGENCY",
+          "value": 4.0
+        },
+        {
+          "feature": "log_overdue_days",
+          "shap_value": 1.17,
+          "direction": "INCREASES_URGENCY",
+          "value": 1.3862943611198906
+        },
+        {
+          "feature": "traffic_density",
+          "shap_value": 0.75,
+          "direction": "INCREASES_URGENCY",
+          "value": 48.0
+        },
+        {
+          "feature": "section_priority_tier",
+          "shap_value": 0.51,
+          "direction": "INCREASES_URGENCY",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "task_id": 105,
+      "score": 69.0,
+      "top_features": [
+        {
+          "feature": "safety_impact",
+          "shap_value": 3.47,
+          "direction": "INCREASES_URGENCY",
+          "value": 16.0
+        },
+        {
+          "feature": "severity",
+          "shap_value": 1.33,
+          "direction": "INCREASES_URGENCY",
+          "value": 4.0
+        },
+        {
+          "feature": "asset_criticality",
+          "shap_value": 0.5,
+          "direction": "INCREASES_URGENCY",
+          "value": 4.0
+        },
+        {
+          "feature": "traffic_density",
+          "shap_value": -0.34,
+          "direction": "DECREASES_URGENCY",
+          "value": 44.0
+        },
+        {
+          "feature": "log_overdue_days",
+          "shap_value": -0.34,
+          "direction": "DECREASES_URGENCY",
+          "value": 0.6931471805599453
+        }
+      ]
+    },
+    {
+      "task_id": 106,
+      "score": 60.5,
+      "top_features": [
+        {
+          "feature": "log_overdue_days",
+          "shap_value": -2.65,
+          "direction": "DECREASES_URGENCY",
+          "value": 0.0
+        },
+        {
+          "feature": "severity",
+          "shap_value": 1.56,
+          "direction": "INCREASES_URGENCY",
+          "value": 4.0
+        },
+        {
+          "feature": "traffic_density",
+          "shap_value": -0.98,
+          "direction": "DECREASES_URGENCY",
+          "value": 42.0
+        },
+        {
+          "feature": "safety_impact",
+          "shap_value": -0.89,
+          "direction": "DECREASES_URGENCY",
+          "value": 12.0
+        },
+        {
+          "feature": "asset_criticality",
+          "shap_value": -0.62,
+          "direction": "DECREASES_URGENCY",
+          "value": 3.0
+        }
+      ]
+    },
+    {
+      "task_id": 107,
+      "score": 60.4,
+      "top_features": [
+        {
+          "feature": "safety_impact",
+          "shap_value": -5.26,
+          "direction": "DECREASES_URGENCY",
+          "value": 9.0
+        },
+        {
+          "feature": "log_overdue_days",
+          "shap_value": 3.87,
+          "direction": "INCREASES_URGENCY",
+          "value": 1.6094379124341003
+        },
+        {
+          "feature": "traffic_density",
+          "shap_value": -1.56,
+          "direction": "DECREASES_URGENCY",
+          "value": 38.0
+        },
+        {
+          "feature": "asset_criticality",
+          "shap_value": -0.6,
+          "direction": "DECREASES_URGENCY",
+          "value": 3.0
+        },
+        {
+          "feature": "severity",
+          "shap_value": -0.54,
+          "direction": "DECREASES_URGENCY",
+          "value": 3.0
+        }
+      ]
+    },
+    {
+      "task_id": 108,
+      "score": 55.1,
+      "top_features": [
+        {
+          "feature": "safety_impact",
+          "shap_value": -5.77,
+          "direction": "DECREASES_URGENCY",
+          "value": 9.0
+        },
+        {
+          "feature": "traffic_density",
+          "shap_value": -2.45,
+          "direction": "DECREASES_URGENCY",
+          "value": 36.0
+        },
+        {
+          "feature": "severity",
+          "shap_value": -0.93,
+          "direction": "DECREASES_URGENCY",
+          "value": 3.0
+        },
+        {
+          "feature": "asset_criticality",
+          "shap_value": -0.53,
+          "direction": "DECREASES_URGENCY",
+          "value": 3.0
+        },
+        {
+          "feature": "log_overdue_days",
+          "shap_value": 0.42,
+          "direction": "INCREASES_URGENCY",
+          "value": 1.0986122886681098
+        }
+      ]
+    },
+    {
+      "task_id": 109,
+      "score": 46.1,
+      "top_features": [
+        {
+          "feature": "safety_impact",
+          "shap_value": -10.94,
+          "direction": "DECREASES_URGENCY",
+          "value": 6.0
+        },
+        {
+          "feature": "traffic_density",
+          "shap_value": -3.26,
+          "direction": "DECREASES_URGENCY",
+          "value": 32.0
+        },
+        {
+          "feature": "log_overdue_days",
+          "shap_value": -1.83,
+          "direction": "DECREASES_URGENCY",
+          "value": 0.6931471805599453
+        },
+        {
+          "feature": "severity",
+          "shap_value": -1.13,
+          "direction": "DECREASES_URGENCY",
+          "value": 3.0
+        },
+        {
+          "feature": "section_priority_tier",
+          "shap_value": -0.88,
+          "direction": "DECREASES_URGENCY",
+          "value": 3.0
+        }
+      ]
+    },
+    {
+      "task_id": 110,
+      "score": 44.6,
+      "top_features": [
+        {
+          "feature": "safety_impact",
+          "shap_value": -14.86,
+          "direction": "DECREASES_URGENCY",
+          "value": 4.0
+        },
+        {
+          "feature": "traffic_density",
+          "shap_value": -4.18,
+          "direction": "DECREASES_URGENCY",
+          "value": 28.0
+        },
+        {
+          "feature": "log_overdue_days",
+          "shap_value": 4.09,
+          "direction": "INCREASES_URGENCY",
+          "value": 1.9459101490553132
+        },
+        {
+          "feature": "severity",
+          "shap_value": -3.07,
+          "direction": "DECREASES_URGENCY",
+          "value": 2.0
+        },
+        {
+          "feature": "asset_criticality",
+          "shap_value": -1.3,
+          "direction": "DECREASES_URGENCY",
+          "value": 2.0
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "model_version": "priority_xgb_v1.0",
+  "algorithm": "XGBoostRegressor",
+  "created_at": "2026-09-12T13:36:21.192218+00:00",
+  "training_samples": 1600,
+  "test_samples": 400,
+  "r2_score": 0.9569,
+  "mae": 1.589,
+  "rmse": 1.906,
+  "cv_mean_r2": 0.9637,
+  "cv_scores": [
+    0.9649,
+    0.959,
+    0.9623,
+    0.9663,
+    0.966
+  ],
+  "features": [
+    "severity",
+    "log_overdue_days",
+    "asset_criticality",
+    "traffic_density",
+    "safety_impact",
+    "estimated_duration_hours",
+    "needs_power_block",
+    "is_emergency",
+    "is_corrective",
+    "section_priority_tier",
+    "tqi",
+    "oms_peak_acceleration_g",
+    "cumulative_gmt"
+  ],
+  "top_features": [
+    "safety_impact",
+    "oms_peak_acceleration_g",
+    "tqi",
+    "asset_criticality",
+    "cumulative_gmt",
+    "log_overdue_days",
+    "section_priority_tier",
+    "traffic_density",
+    "is_emergency",
+    "severity",
+    "estimated_duration_hours",
+    "needs_power_block",
+    "is_corrective"
+  ],
+  "hyperparameters": {
+    "n_estimators": 180,
+    "max_depth": 5,
+    "learning_rate": 0.08
+  }
+}
