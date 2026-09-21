@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useAppStore } from '../../lib/store';
 import { CORRIDORS } from '../../lib/constants';
 import { OptimizedBlock } from '../../lib/types';
@@ -24,14 +24,31 @@ import {
   Sparkles,
   Layers,
   CheckCircle2,
+  Info,
 } from 'lucide-react';
 
 interface BlockGanttProps {
   interactive?: boolean;
 }
 
+function parseTimeToMinutes(timeStr?: string): number | null {
+  if (!timeStr) return null;
+  // Try HH:mm format first
+  const match = timeStr.match(/(\d{1,2}):(\d{2})/);
+  if (match) {
+    return parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+  }
+  // Try ISO date
+  const dt = new Date(timeStr);
+  if (!isNaN(dt.getTime())) {
+    return (dt.getUTCHours() * 60 + dt.getUTCMinutes()) % (24 * 60);
+  }
+  return null;
+}
+
 function BlockGanttComponent({ interactive = true }: BlockGanttProps) {
   const activePlan = useAppStore((s) => s.activePlan);
+  const fieldRequests = useAppStore((s) => s.fieldRequests || []);
   const selectedBlock = useAppStore((s) => s.selectedBlock);
   const setSelectedBlock = useAppStore((s) => s.setSelectedBlock);
   const setSelectedSection = useAppStore((s) => s.setSelectedSection);
@@ -50,7 +67,7 @@ function BlockGanttComponent({ interactive = true }: BlockGanttProps) {
     setMounted(true);
   }, []);
 
-  const sections = React.useMemo(() => {
+  const sections = useMemo(() => {
     if (zoneFilter === 'NORTH') {
       return CORRIDORS.filter((c) => !c.zone || c.zone.includes('NR') || c.zone.includes('NCR'));
     }
@@ -68,29 +85,95 @@ function BlockGanttComponent({ interactive = true }: BlockGanttProps) {
     return CORRIDORS;
   }, [zoneFilter]);
 
-  const blocks = activePlan?.optimized_plan?.blocks || [];
+  // Combine real sanctioned field requests with active plan blocks without duplicates
+  const blocks: OptimizedBlock[] = useMemo(() => {
+    const planBlocks = activePlan?.optimized_plan?.blocks || [];
+    const existingIds = new Set<string>();
+    planBlocks.forEach((b) => {
+      if (b.block_id) existingIds.add(b.block_id);
+    });
 
-  // Generate 15-min time slots based on zoom mode
-  const { totalSlots, slotWidth } = React.useMemo(() => {
-    const total = zoomMode === '6h' ? 24 : zoomMode === '24h' ? 96 : 7 * 24;
-    const width = zoomMode === '6h' ? 36 : zoomMode === '24h' ? 18 : 6;
-    return { totalSlots: total, slotWidth: width };
+    const dynamicBlocks: OptimizedBlock[] = [];
+    for (const req of fieldRequests) {
+      if (req.status !== 'SANCTIONED' && req.status !== 'IN_PROGRESS' && req.status !== 'DISCONNECTED') {
+        continue;
+      }
+      const blkId = req.sanctioned_block_id || `BLK-${req.section}-${req.task_id}`;
+      if (existingIds.has(blkId)) continue;
+      existingIds.add(blkId);
+
+      dynamicBlocks.push({
+        block_id: blkId,
+        task_ids: [req.task_id],
+        section: req.section,
+        department: req.department as any,
+        block_type: 'INTEGRATED_BLOCK',
+        scheduled_start: req.scheduled_start || '01:30',
+        scheduled_end: req.scheduled_end || '03:30',
+        duration_minutes: req.duration_minutes || 120,
+        priority_score: req.priority_score || 85,
+        confidence: 0.99,
+        conflict_score: 0.0,
+        downtime_saved_minutes: req.downtime_saved_minutes || (req.is_fused ? 45 : 30),
+        reason: req.reason || `Official Sanction: Form T/351 Memo ${req.worker_memo_code || req.task_id}`,
+        is_emergency: false,
+        user_id: req.user_id,
+        submitter_name: req.submitter_name,
+        is_fused: req.is_fused,
+      });
+    }
+
+    return [...dynamicBlocks, ...planBlocks];
+  }, [activePlan, fieldRequests]);
+
+  // Slots and widths by zoom mode
+  // 6h: 00:00 to 06:00 (24 slots of 15 min, width = 38px) - nocturnal possession window
+  // 24h: 00:00 to 24:00 (96 slots of 15 min, width = 18px) - full day view
+  // 7d: 7 days (28 intervals of 6h, width = 32px) - weekly possession horizon
+  const { totalSlots, slotWidth, windowStartMinutes, windowSpanMinutes } = useMemo(() => {
+    if (zoomMode === '6h') {
+      return { totalSlots: 24, slotWidth: 38, windowStartMinutes: 0, windowSpanMinutes: 360 };
+    }
+    if (zoomMode === '24h') {
+      return { totalSlots: 96, slotWidth: 18, windowStartMinutes: 0, windowSpanMinutes: 1440 };
+    }
+    return { totalSlots: 28, slotWidth: 32, windowStartMinutes: 0, windowSpanMinutes: 7 * 1440 };
   }, [zoomMode]);
 
-  const timeLabels = React.useMemo(() => {
-    return Array.from({ length: totalSlots }).map((_, i) => {
-      const totalMinutes = i * 15;
-      const hrs = Math.floor((totalMinutes / 60) % 24);
-      const mins = totalMinutes % 60;
-      return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
-    });
-  }, [totalSlots]);
+  const timeLabels = useMemo(() => {
+    if (zoomMode === '6h') {
+      return Array.from({ length: totalSlots }).map((_, i) => {
+        const totalMinutes = i * 15;
+        const hrs = Math.floor(totalMinutes / 60);
+        const mins = totalMinutes % 60;
+        return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+      });
+    }
+    if (zoomMode === '24h') {
+      return Array.from({ length: totalSlots }).map((_, i) => {
+        const totalMinutes = i * 15;
+        const hrs = Math.floor((totalMinutes / 60) % 24);
+        const mins = totalMinutes % 60;
+        return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+      });
+    }
+    // 7d: Days of week with Night/Day indicators
+    const days = ['Day 1 (Mon)', 'Day 2 (Tue)', 'Day 3 (Wed)', 'Day 4 (Thu)', 'Day 5 (Fri)', 'Day 6 (Sat)', 'Day 7 (Sun)'];
+    const labels: string[] = [];
+    for (let d = 0; d < 7; d++) {
+      labels.push(`${days[d]} 00-06h`);
+      labels.push('06-12h');
+      labels.push('12-18h');
+      labels.push('18-24h');
+    }
+    return labels;
+  }, [zoomMode, totalSlots]);
 
   // Calculate "NOW" playhead position
   const now = new Date();
   const currentMinutes = (now.getHours() * 60 + now.getMinutes()) % (24 * 60);
   const currentSlot = Math.floor(currentMinutes / 15);
-  const nowLeft = currentSlot * slotWidth;
+  const nowLeft = zoomMode === '24h' ? currentSlot * slotWidth : (currentMinutes / 360) * (totalSlots * slotWidth);
 
   // Auto-follow scroll effect
   useEffect(() => {
@@ -99,26 +182,33 @@ function BlockGanttComponent({ interactive = true }: BlockGanttProps) {
     }
   }, [autoFollow, nowLeft]);
 
-  // Block positioning helper: parses scheduled_start or falls back to slot offset
+  // Block positioning helper
   const getBlockStyle = (block: OptimizedBlock, idx: number) => {
-    let startMinutes: number;
-    if (block.scheduled_start) {
-      const dt = new Date(block.scheduled_start);
-      if (!isNaN(dt.getTime())) {
-        startMinutes = (dt.getUTCHours() * 60 + dt.getUTCMinutes()) % (24 * 60);
-      } else {
-        startMinutes = (idx * 85 + 30) % (24 * 60);
-      }
-    } else {
-      startMinutes = (idx * 85 + 30) % (24 * 60);
-    }
+    const parsedStart = parseTimeToMinutes(block.scheduled_start);
+    let startMinutes = parsedStart !== null ? parsedStart : (idx * 85 + 30) % (24 * 60);
     const durationMinutes = block.duration_minutes || 120;
-    const startSlot = Math.floor(startMinutes / 15);
-    const slotsSpan = Math.max(2, Math.ceil(durationMinutes / 15));
 
-    const left = startSlot * slotWidth;
-    const width = slotsSpan * slotWidth;
+    if (zoomMode === '6h') {
+      // In 6h mode, clamp to 0-360 window
+      const clampedStart = Math.min(330, Math.max(0, startMinutes));
+      const left = (clampedStart / 360) * (totalSlots * slotWidth);
+      const width = Math.max(70, (durationMinutes / 360) * (totalSlots * slotWidth));
+      return { left: Math.max(0, left), width: Math.min(width, totalSlots * slotWidth - left) };
+    }
 
+    if (zoomMode === '24h') {
+      const startSlot = Math.floor(startMinutes / 15);
+      const slotsSpan = Math.max(2, Math.ceil(durationMinutes / 15));
+      const left = startSlot * slotWidth;
+      const width = slotsSpan * slotWidth;
+      return { left, width };
+    }
+
+    // 7d mode
+    const dayIndex = idx % 7;
+    const dayOffsetMinutes = dayIndex * 1440 + (startMinutes % 1440);
+    const left = (dayOffsetMinutes / (7 * 1440)) * (totalSlots * slotWidth);
+    const width = Math.max(50, (durationMinutes / (7 * 1440)) * (totalSlots * slotWidth) * 4);
     return { left, width };
   };
 
@@ -133,7 +223,7 @@ function BlockGanttComponent({ interactive = true }: BlockGanttProps) {
         <div className="flex items-center space-x-2">
           <Clock className="w-4 h-4 text-[#0F2D6B]" />
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-            Corridor Possession Timeline (15-min Slot Grid)
+            Corridor Possession Timeline (Slot Grid)
           </h3>
           <span className="text-[10px] text-slate-500 font-semibold">
             ({blocks.length} possessions across {sections.length} corridors)
@@ -185,7 +275,7 @@ function BlockGanttComponent({ interactive = true }: BlockGanttProps) {
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                {mode.toUpperCase()}
+                {mode === '6h' ? '6h (Night)' : mode === '24h' ? '24h (Day)' : '7d (Week)'}
               </button>
             ))}
           </div>
@@ -200,11 +290,11 @@ function BlockGanttComponent({ interactive = true }: BlockGanttProps) {
         </span>
         {[
           { id: 'ALL', label: 'All Departments' },
-          { id: 'ENG', label: '🟢 Engineering (P-Way)', color: 'bg-emerald-600 text-white' },
-          { id: 'SIGNAL', label: '🔵 Signal & Telecom (S&T)', color: 'bg-blue-600 text-white' },
-          { id: 'TRD', label: '🟠 Traction (OHE)', color: 'bg-amber-600 text-white' },
-          { id: 'OPERATING', label: '🟣 Operating / Mech', color: 'bg-purple-600 text-white' },
-          { id: 'FUSED', label: '⚡ Fused Blocks Only', color: 'bg-gradient-to-r from-emerald-600 via-blue-600 to-amber-600 text-white' },
+          { id: 'ENG', label: '🟩 Engineering (P-Way)', color: 'bg-[#10b981] text-white' },
+          { id: 'SIGNAL', label: '🟦 Signal & Telecom (S&T)', color: 'bg-[#3b82f6] text-white' },
+          { id: 'TRD', label: '🟧 Traction / OHE (TRD)', color: 'bg-[#f59e0b] text-white' },
+          { id: 'OPERATING', label: '🟪 Mechanical / C&W', color: 'bg-[#a855f7] text-white' },
+          { id: 'FUSED', label: '⚡ Fused Blocks Only', color: 'bg-gradient-to-r from-emerald-600 via-blue-600 to-purple-600 text-white' },
         ].map((d) => {
           const isSel = deptFilter === d.id;
           return (
@@ -245,8 +335,9 @@ function BlockGanttComponent({ interactive = true }: BlockGanttProps) {
                   {formatTimeOnly(selectedBlock.scheduled_start)} - {formatTimeOnly(selectedBlock.scheduled_end)} ({selectedBlock.duration_minutes}m)
                 </span>
                 {isBlockFused(selectedBlock) && (
-                  <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 font-black text-[9px] border border-amber-300">
-                    ⚡ FUSED JOINT BLOCK (+{selectedBlock.downtime_saved_minutes || 30}m Saved)
+                  <span className="ml-2 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[9px] border border-amber-300 inline-flex items-center gap-1 shadow-xs">
+                    <Zap className="w-2.5 h-2.5 fill-current" />
+                    <span>⚡ FUSED JOINT BLOCK • +{selectedBlock.downtime_saved_minutes || 45}m Saved</span>
                   </span>
                 )}
               </span>
@@ -256,7 +347,7 @@ function BlockGanttComponent({ interactive = true }: BlockGanttProps) {
           <div className="flex items-center space-x-2 shrink-0">
             <button
               onClick={() => setExplanationOpen(true)}
-              className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-[#0F2D6B] text-xs font-bold border border-blue-300 shadow-2xs flex items-center space-x-1.5 transition"
+              className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-[#0F2D6B] text-xs font-bold border border-blue-300 shadow-2xs flex items-center space-x-1.5 transition cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5 text-[#0F2D6B]" />
               <span>Inspect AI Explanation & SHAP</span>
@@ -279,16 +370,16 @@ function BlockGanttComponent({ interactive = true }: BlockGanttProps) {
             </div>
             <div className="flex">
               {timeLabels.map((lbl, idx) => {
-                const isHour = idx % 4 === 0;
+                const isMajor = zoomMode === '6h' ? idx % 4 === 0 : zoomMode === '24h' ? idx % 4 === 0 : idx % 4 === 0;
                 return (
                   <div
                     key={idx}
-                    className={`shrink-0 text-[9px] text-center border-r border-slate-200/80 py-1.5 ${
-                      isHour ? 'font-bold text-slate-900 bg-slate-200/40' : 'text-slate-400'
+                    className={`shrink-0 text-[9px] text-center border-r border-slate-200/80 py-1.5 truncate px-0.5 ${
+                      isMajor ? 'font-bold text-slate-900 bg-slate-200/40' : 'text-slate-400'
                     }`}
                     style={{ width: `${slotWidth}px` }}
                   >
-                    {isHour ? lbl : ''}
+                    {isMajor ? lbl : ''}
                   </div>
                 );
               })}
@@ -298,7 +389,7 @@ function BlockGanttComponent({ interactive = true }: BlockGanttProps) {
           {/* Corridor Rows */}
           <div className="relative">
             {/* "NOW" Vertical Playhead */}
-            {mounted && (
+            {mounted && zoomMode === '24h' && (
               <div
                 suppressHydrationWarning
                 className="absolute top-0 bottom-0 z-10 pointer-events-none flex flex-col items-center"
@@ -318,7 +409,7 @@ function BlockGanttComponent({ interactive = true }: BlockGanttProps) {
                 if (deptFilter === 'ENG') return d.includes('eng') || d.includes('track') || d.includes('p-way');
                 if (deptFilter === 'SIGNAL') return d.includes('signal') || d.includes('s&t');
                 if (deptFilter === 'TRD') return d.includes('traction') || d.includes('trd') || d.includes('ohe');
-                if (deptFilter === 'OPERATING') return d.includes('operating') || d.includes('mech');
+                if (deptFilter === 'OPERATING') return d.includes('operating') || d.includes('mech') || d.includes('c&w');
                 return true;
               });
               const hasEmergency = activeEmergencies.some((e) => e.corridor === sec.section_code);
@@ -366,7 +457,7 @@ function BlockGanttComponent({ interactive = true }: BlockGanttProps) {
                       const isSelected = selectedBlock?.block_id === blk.block_id;
                       const isFused = isBlockFused(blk);
                       const fusionPill = isFused ? getFusionDepartmentPill(blk.department) : null;
-                      const downtimeSaved = blk.downtime_saved_minutes || 30;
+                      const downtimeSaved = blk.downtime_saved_minutes || 45;
 
                       return (
                         <div
@@ -387,7 +478,7 @@ function BlockGanttComponent({ interactive = true }: BlockGanttProps) {
                           }}
                           title={
                             isFused
-                              ? `⚡ [FUSED JOINT BLOCK]: ${blk.department} on ${blk.section}. Bundles multiple teams into 1 possession, saving +${downtimeSaved}m track downtime!`
+                              ? `⚡ [FUSED JOINT BLOCK • +${downtimeSaved}m Saved]: ${blk.department} on ${blk.section}. Bundles multiple teams into 1 possession!`
                               : blk.user_id
                               ? `Demanded by User ${blk.user_id}${blk.submitter_name ? ` (${blk.submitter_name})` : ''} • ${blk.department} on ${blk.section} (${blk.duration_minutes}m)`
                               : blk.is_emergency
@@ -402,12 +493,12 @@ function BlockGanttComponent({ interactive = true }: BlockGanttProps) {
                               </span>
                             )}
                             {isFused && (
-                              <span className="px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 font-black text-[8px] uppercase tracking-wider shrink-0 flex items-center gap-0.5 shadow-2xs">
+                              <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[8px] uppercase tracking-wider shrink-0 flex items-center gap-0.5 shadow-2xs">
                                 <Zap className="w-2.5 h-2.5 fill-current" />
-                                <span>FUSED</span>
+                                <span>[⚡ FUSED JOINT BLOCK • +{downtimeSaved}m Saved]</span>
                               </span>
                             )}
-                            {fusionPill && (
+                            {!isFused && fusionPill && (
                               <span className="px-1 py-0.5 rounded bg-white/20 text-white font-mono font-bold text-[8px] shrink-0 hidden md:inline">
                                 {fusionPill}
                               </span>
@@ -416,11 +507,6 @@ function BlockGanttComponent({ interactive = true }: BlockGanttProps) {
                           </div>
 
                           <div className="flex items-center space-x-1 shrink-0 pl-1 font-bold text-white text-[9px]">
-                            {isFused && (
-                              <span className="px-1.5 py-0.5 rounded bg-emerald-400 text-slate-950 font-black text-[8px] shrink-0 hidden sm:inline">
-                                +{downtimeSaved}m Saved
-                              </span>
-                            )}
                             <span className="opacity-90 hidden sm:inline font-mono">{blk.duration_minutes}m</span>
                           </div>
                         </div>
@@ -438,26 +524,26 @@ function BlockGanttComponent({ interactive = true }: BlockGanttProps) {
       <div className="flex flex-wrap items-center justify-between gap-3 text-[11px] text-slate-700 pt-2 border-t border-slate-200">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 font-mono">
           <span className="flex items-center space-x-1.5">
-            <span className="w-3.5 h-2.5 rounded-sm bg-emerald-600 inline-block shadow-2xs border border-emerald-400" />
+            <span className="w-3.5 h-2.5 rounded-sm bg-[#10b981] inline-block shadow-2xs border border-emerald-400" />
             <span className="font-bold text-slate-800">Engineering (P-Way)</span>
           </span>
           <span className="flex items-center space-x-1.5">
-            <span className="w-3.5 h-2.5 rounded-sm bg-blue-600 inline-block shadow-2xs border border-blue-400" />
+            <span className="w-3.5 h-2.5 rounded-sm bg-[#3b82f6] inline-block shadow-2xs border border-blue-400" />
             <span className="font-bold text-slate-800">Signal &amp; Telecom (S&amp;T)</span>
           </span>
           <span className="flex items-center space-x-1.5">
-            <span className="w-3.5 h-2.5 rounded-sm bg-amber-600 inline-block shadow-2xs border border-amber-400" />
-            <span className="font-bold text-slate-800">Traction / Electrical (OHE)</span>
+            <span className="w-3.5 h-2.5 rounded-sm bg-[#f59e0b] inline-block shadow-2xs border border-amber-400" />
+            <span className="font-bold text-slate-800">Traction / OHE (TRD)</span>
           </span>
           <span className="flex items-center space-x-1.5">
-            <span className="w-3.5 h-2.5 rounded-sm bg-purple-600 inline-block shadow-2xs border border-purple-400" />
-            <span className="font-bold text-slate-800">Operating / Mechanical</span>
+            <span className="w-3.5 h-2.5 rounded-sm bg-[#a855f7] inline-block shadow-2xs border border-purple-400" />
+            <span className="font-bold text-slate-800">Mechanical / C&amp;W</span>
           </span>
           <span className="flex items-center space-x-1.5">
-            <span className="w-4 h-2.5 rounded-sm bg-gradient-to-r from-emerald-600 via-blue-600 to-amber-600 inline-block shadow-2xs border-2 border-amber-300" />
+            <span className="w-4 h-2.5 rounded-sm bg-gradient-to-r from-emerald-600 via-blue-600 to-purple-600 inline-block shadow-2xs border-2 border-amber-300 animate-pulse" />
             <span className="text-amber-900 font-extrabold flex items-center gap-1">
-              <Zap className="w-3 h-3 text-amber-600" />
-              <span>[⚡ FUSED JOINT BLOCK] (+30m Saved)</span>
+              <Zap className="w-3 h-3 text-amber-600 fill-current" />
+              <span>[⚡ FUSED JOINT BLOCK • +45m Saved]</span>
             </span>
           </span>
           <span className="flex items-center space-x-1.5">
@@ -474,4 +560,3 @@ function BlockGanttComponent({ interactive = true }: BlockGanttProps) {
   );
 }
 export const BlockGantt = React.memo(BlockGanttComponent);
-

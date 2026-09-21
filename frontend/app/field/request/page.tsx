@@ -4,7 +4,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
 import { submitFieldDemand, completeWork, FieldDemandPayload } from '../../../lib/api';
 import { useAppStore, FieldBlockRequest, createSpecializedRailBlockToken, resetLocalState, isFieldRequestMatch } from '../../../lib/store';
-import { getNearestStation, RailwayStationInfo } from '../../../lib/stations';
+import { getNearestStation, RailwayStationInfo, ALL_STATION_DESKS } from '../../../lib/stations';
+import { ALL_KARNATAKA_CORRIDORS } from '../../../lib/karnatakaGis';
 import { JEUserProfile, DEFAULT_JE_USERS, getJEUser } from '../../../lib/users';
 import { getDepartmentBadgeColor, isBlockFused, getFusionDepartmentPill } from '../../../lib/format';
 import {
@@ -1171,6 +1172,50 @@ export default function FieldRequestPage() {
                 </h3>
               </div>
 
+              {/* Quick Station Pre-fill (159 Stations) */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">
+                    ⚡ Quick Station Pre-fill (All 159 Karnataka Stations)
+                  </label>
+                  <span className="text-[10px] font-mono text-blue-600 font-bold">Instant KM Autofill</span>
+                </div>
+                <select
+                  onChange={(e) => {
+                    const stnCode = e.target.value;
+                    if (!stnCode) return;
+                    const found = ALL_STATION_DESKS.find((s) => s.code === stnCode);
+                    if (found) {
+                      if (found.section) setSection(found.section);
+                      const parsedKm = parseFloat(found.km.replace(/[^\d.]/g, '')) || 0;
+                      setKmFrom(parsedKm);
+                      setKmTo(+(parsedKm + 2.0).toFixed(1));
+                    }
+                  }}
+                  defaultValue=""
+                  className="w-full bg-blue-50/60 border border-blue-200 rounded-lg p-2.5 text-xs text-[#0F2D6B] font-bold focus:border-[#0F2D6B] focus:outline-none cursor-pointer"
+                >
+                  <option value="" disabled>
+                    -- Select Station to Auto-fill Corridor &amp; KM Range --
+                  </option>
+                  {['Bengaluru', 'Mysuru', 'Hubballi', 'Konkan Railway', 'Kalaburagi', 'Guntakal'].map((div) => {
+                    const stns = ALL_STATION_DESKS.filter(
+                      (s) => s.division === div || (div === 'Konkan Railway' && s.division?.includes('Konkan'))
+                    );
+                    if (stns.length === 0) return null;
+                    return (
+                      <optgroup key={div} label={`${div} Division (${stns.length} Stations)`}>
+                        {stns.map((s) => (
+                          <option key={s.code} value={s.code}>
+                            {s.name} ({s.code} • {s.km})
+                          </option>
+                        ))}
+                      </optgroup>
+                    );
+                  })}
+                </select>
+              </div>
+
               {/* Corridor Selection */}
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">
@@ -1181,10 +1226,11 @@ export default function FieldRequestPage() {
                   onChange={(e) => setSection(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 font-semibold focus:border-blue-500 focus:outline-none"
                 >
-                  <option value="SBC-MYS">SBC-MYS (Bengaluru Central - Mysuru Junction)</option>
-                  <option value="SBC-UBL">SBC-UBL (Bengaluru Central - Hubballi Junction)</option>
-                  <option value="SBC-YPR-BAY">SBC-YPR-BAY (Yesvantpur - Ballari Junction)</option>
-                  <option value="MYS-SMET">MYS-SMET (Mysuru Junction - Shivamogga Town)</option>
+                  {ALL_KARNATAKA_CORRIDORS.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.id} ({c.name} • {c.total_km} km)
+                    </option>
+                  ))}
                 </select>
               </div>
 

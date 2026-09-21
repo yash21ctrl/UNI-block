@@ -93,6 +93,24 @@ const STATION_TIMETABLES: Record<string, Array<{
     { train_no: '20607', train_name: 'Vande Bharat Express Passing', time: '05:52 IST', platform: 'Mainline Thru', status: 'ON TIME (+0.0m)', type: 'VIP SUPERFAST', signal_aspect: 'PROCEED' },
     { train_no: '16215', train_name: 'Chamundi Express', time: '07:05 IST', platform: 'PF 1', status: 'ON TIME (+0.0m)', type: 'INTERCITY EXP', signal_aspect: 'PROCEED' },
   ],
+  UBL: [
+    { train_no: '20661', train_name: 'Vande Bharat Express (SBC-DWR)', time: '11:30 IST', platform: 'PF 1 (World Longest)', status: 'ON TIME (+0.0m)', type: 'VIP SUPERFAST', signal_aspect: 'PROCEED' },
+    { train_no: '16589', train_name: 'Rani Chennamma Express (SBC-BGM)', time: '05:40 IST', platform: 'PF 2', status: 'ON TIME (+0.0m)', type: 'SUPERFAST', signal_aspect: 'PROCEED' },
+    { train_no: '17301', train_name: 'Mysuru - Dharwad Express', time: '04:15 IST', platform: 'PF 3', status: 'ON TIME (+0.0m)', type: 'EXPRESS', signal_aspect: 'PROCEED' },
+    { train_no: 'BOXN-882', train_name: 'JSW Steel Pellets Heavy Mineral Haul', time: '02:00 IST', platform: 'Freight Line 4', status: 'HOLD / POSSESSION', type: 'FREIGHT', signal_aspect: 'STOP' },
+  ],
+  BGM: [
+    { train_no: '16589', train_name: 'Rani Chennamma Express Arrival', time: '07:30 IST', platform: 'PF 1', status: 'ON TIME (+0.0m)', type: 'SUPERFAST', signal_aspect: 'PROCEED' },
+    { train_no: '20661', train_name: 'Vande Bharat Express Passing', time: '12:45 IST', platform: 'PF 2', status: 'ON TIME (+0.0m)', type: 'VIP SUPERFAST', signal_aspect: 'PROCEED' },
+  ],
+  MAJN: [
+    { train_no: '16595', train_name: 'Panchaganga Superfast Express', time: '05:15 IST', platform: 'PF 1', status: 'ON TIME (+0.0m)', type: 'SUPERFAST', signal_aspect: 'PROCEED' },
+    { train_no: '16515', train_name: 'Karwar Express via Sakleshpur', time: '16:40 IST', platform: 'PF 2', status: 'ON TIME (+0.0m)', type: 'EXPRESS', signal_aspect: 'PROCEED' },
+  ],
+  HAS: [
+    { train_no: '16515', train_name: 'Yesvantpur - Karwar Intercity', time: '10:15 IST', platform: 'PF 1', status: 'ON TIME (+0.0m)', type: 'EXPRESS', signal_aspect: 'PROCEED' },
+    { train_no: '16579', train_name: 'Yesvantpur - Shivamogga Town', time: '12:30 IST', platform: 'PF 2', status: 'ON TIME (+0.0m)', type: 'EXPRESS', signal_aspect: 'PROCEED' },
+  ],
 };
 
 // Helper to calculate exact left and width percentage for Gantt possession bars (00:00 to 06:00 window = 360m)
@@ -139,7 +157,7 @@ export default function StationMasterPortalPage() {
   const updateFieldRequestStatus = useAppStore((s) => s.updateFieldRequestStatus);
   const addAuditEntry = useAppStore((s) => s.addAuditEntry);
 
-  // Station & Operator selection (Defaults to Mandya / URL parameter ?stn=)
+  // Station & Operator selection (Defaults to Universal All-Karnataka Memos view / URL parameter ?stn=)
   const [selectedStationCode, setSelectedStationCode] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -148,9 +166,14 @@ export default function StationMasterPortalPage() {
         return urlStn.toUpperCase();
       }
     }
-    return 'MYA';
+    return 'ALL';
   });
   const [selectedUserFilter, setSelectedUserFilter] = useState<string>('ALL');
+
+  // Fast station searchable dialog state
+  const [isStationSearchOpen, setIsStationSearchOpen] = useState(false);
+  const [stationSearchQuery, setStationSearchQuery] = useState('');
+  const [stationDivisionFilter, setStationDivisionFilter] = useState('ALL');
 
   // Sync if URL search params change
   useEffect(() => {
@@ -166,13 +189,13 @@ export default function StationMasterPortalPage() {
     if (selectedStationCode === 'ALL') {
       return {
         code: 'ALL',
-        name: 'All Stations (Corridor Overview)',
-        fullName: 'Corridor-Wide Multi-Station Operating Desk',
-        km: 'KM 0.0 - 470.0',
-        tracks: ['Down Fast (Mainline)', 'Up Fast (Mainline)', 'Loop / Goods Siding', 'OHE Catenary Sector'],
-        sm_id: 'SM-CORRIDOR-ALL',
+        name: 'All Karnataka Stations (Universal Overview)',
+        fullName: 'South Western Railway Corridor-Wide Operating Desk (159 Stations)',
+        km: 'KM 0.0 - 716.0',
+        tracks: ['Down Fast (Mainline)', 'Up Fast (Mainline)', 'Passing Loops / Siding', '25kV AC OHE Sector'],
+        sm_id: 'SM-SWR-KAR-ALL',
         section: 'ALL-CORRIDORS',
-        division: 'South Western Railway',
+        division: 'South Western Railway (12 Corridors)',
       };
     }
     return KARNATAKA_STATIONS.find((s) => s.code === selectedStationCode) || KARNATAKA_STATIONS[6];
@@ -536,6 +559,26 @@ export default function StationMasterPortalPage() {
     }
     return list;
   }, [selectedStationCode, stationMemoCounts]);
+
+  // Track all currently sanctioned memos across Karnataka awaiting Station Master processing
+  const incomingSanctionedDemands = useMemo(() => {
+    return fieldRequests.filter(
+      (r) => (r.status === 'SANCTIONED' || (r.status as string) === 'APPROVED') && !r.sm_verified
+    );
+  }, [fieldRequests]);
+
+  const latestIncomingDemand = incomingSanctionedDemands[0] || null;
+  const latestIncomingNearest = useMemo(() => {
+    if (!latestIncomingDemand) return null;
+    return getNearestStation(latestIncomingDemand.section, latestIncomingDemand.km_from ?? 45.0);
+  }, [latestIncomingDemand]);
+  const latestIncomingStationCode = latestIncomingDemand?.nearest_station_code || latestIncomingNearest?.code || 'MYA';
+  const latestIncomingStation = useMemo(() => {
+    return KARNATAKA_STATIONS.find((s) => s.code === latestIncomingStationCode) || {
+      name: latestIncomingStationCode,
+      code: latestIncomingStationCode,
+    };
+  }, [latestIncomingStationCode]);
 
   // --------------------------------------------------------------------------
   // MODAL STATES
@@ -1154,61 +1197,48 @@ export default function StationMasterPortalPage() {
 
           {/* Center: Station Switcher & Quick Universal QR Scanner */}
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center space-x-2 bg-slate-50 p-1 rounded-xl border border-slate-200">
-              <MapPin className="w-4 h-4 text-[#0F2D6B] ml-2 shrink-0" />
-              <span className="text-xs font-bold text-slate-500 hidden sm:inline">Station:</span>
+            <div className="flex items-center space-x-1.5 bg-slate-50 p-1 rounded-xl border border-slate-200">
+              <MapPin className="w-4 h-4 text-[#0F2D6B] ml-1.5 shrink-0" />
+              <button
+                type="button"
+                onClick={() => setIsStationSearchOpen(true)}
+                className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#0F2D6B] font-bold text-xs flex items-center space-x-1 border border-blue-200 transition cursor-pointer shadow-2xs"
+                title="Search across all 159 Karnataka stations"
+              >
+                <Search className="w-3 h-3" />
+                <span className="hidden sm:inline">Search 159 Stations</span>
+              </button>
+
               <div className="relative">
                 <select
                   value={selectedStationCode}
                   onChange={(e) => setSelectedStationCode(e.target.value)}
-                  className="bg-white border border-slate-300 text-slate-900 text-xs font-bold rounded-lg pl-2.5 pr-8 py-1.5 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#0F2D6B] shadow-xs"
+                  className="bg-white border border-slate-300 text-slate-900 text-xs font-bold rounded-lg pl-2.5 pr-8 py-1.5 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#0F2D6B] shadow-xs max-w-[200px] sm:max-w-[260px] truncate"
                 >
                   <option value="ALL">
-                    🌐 ALL STATIONS (Corridor-Wide Overview)
+                    🌐 ALL KARNATAKA STATIONS (159)
                     {Object.values(stationMemoCounts).reduce((a, b) => a + b, 0) > 0
                       ? ` • [${Object.values(stationMemoCounts).reduce((a, b) => a + b, 0)} Memos]`
                       : ''}
                   </option>
-                  <optgroup label="SBC-MYS (Bengaluru - Mysuru Corridor)">
-                    {KARNATAKA_STATIONS.filter((s) => s.section === 'SBC-MYS').map((stn) => {
-                      const count = stationMemoCounts[stn.code] || 0;
-                      return (
-                        <option key={stn.code} value={stn.code}>
-                          {stn.name} ({stn.km}){count > 0 ? ` • [${count} ${count === 1 ? 'Memo' : 'Memos'}]` : ''}
-                        </option>
-                      );
-                    })}
-                  </optgroup>
-                  <optgroup label="SBC-UBL (Bengaluru - Hubballi Corridor)">
-                    {KARNATAKA_STATIONS.filter((s) => s.section === 'SBC-UBL').map((stn) => {
-                      const count = stationMemoCounts[stn.code] || 0;
-                      return (
-                        <option key={stn.code} value={stn.code}>
-                          {stn.name} ({stn.km}){count > 0 ? ` • [${count} ${count === 1 ? 'Memo' : 'Memos'}]` : ''}
-                        </option>
-                      );
-                    })}
-                  </optgroup>
-                  <optgroup label="SBC-YPR-BAY (Ballari Corridor)">
-                    {KARNATAKA_STATIONS.filter((s) => s.section === 'SBC-YPR-BAY').map((stn) => {
-                      const count = stationMemoCounts[stn.code] || 0;
-                      return (
-                        <option key={stn.code} value={stn.code}>
-                          {stn.name} ({stn.km}){count > 0 ? ` • [${count} ${count === 1 ? 'Memo' : 'Memos'}]` : ''}
-                        </option>
-                      );
-                    })}
-                  </optgroup>
-                  <optgroup label="MYS-SMET (Shivamogga Corridor)">
-                    {KARNATAKA_STATIONS.filter((s) => s.section === 'MYS-SMET').map((stn) => {
-                      const count = stationMemoCounts[stn.code] || 0;
-                      return (
-                        <option key={stn.code} value={stn.code}>
-                          {stn.name} ({stn.km}){count > 0 ? ` • [${count} ${count === 1 ? 'Memo' : 'Memos'}]` : ''}
-                        </option>
-                      );
-                    })}
-                  </optgroup>
+                  {['Bengaluru', 'Mysuru', 'Hubballi', 'Konkan Railway', 'Kalaburagi', 'Guntakal'].map((div) => {
+                    const stns = KARNATAKA_STATIONS.filter(
+                      (s) => s.division === div || (div === 'Konkan Railway' && s.division?.includes('Konkan'))
+                    );
+                    if (stns.length === 0) return null;
+                    return (
+                      <optgroup key={div} label={`${div} Division (${stns.length})`}>
+                        {stns.map((stn) => {
+                          const count = stationMemoCounts[stn.code] || 0;
+                          return (
+                            <option key={stn.code} value={stn.code}>
+                              {stn.name} ({stn.code} • {stn.km}){count > 0 ? ` • [${count} ${count === 1 ? 'Memo' : 'Memos'}]` : ''}
+                            </option>
+                          );
+                        })}
+                      </optgroup>
+                    );
+                  })}
                 </select>
                 <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 w-3.5 h-3.5" />
               </div>
@@ -1269,6 +1299,86 @@ export default function StationMasterPortalPage() {
           </div>
         </div>
       </header>
+
+      {/* ========================================================================= */}
+      {/* 1b. LIVE ANIMATED "⚡ NEW SANCTIONED MEMO INCOMING" NOTIFICATION BANNER    */}
+      {/* ========================================================================= */}
+      {incomingSanctionedDemands.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 mt-3 w-full animate-in fade-in slide-in-from-top-2">
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white shadow-xl border-2 border-amber-300 ring-4 ring-amber-400/30 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center space-x-3.5 min-w-0">
+              <div className="w-12 h-12 rounded-xl bg-white text-amber-700 flex items-center justify-center font-black shrink-0 shadow-md animate-bounce">
+                <Zap className="w-7 h-7 fill-current text-amber-600" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full bg-white text-slate-950 font-black text-[10px] tracking-wider uppercase shadow-2xs flex items-center gap-1 animate-pulse">
+                    <span className="w-2 h-2 rounded-full bg-amber-600 animate-ping inline-block" />
+                    <span>⚡ NEW SANCTIONED MEMO INCOMING ({incomingSanctionedDemands.length})</span>
+                  </span>
+                  <span className="text-xs font-mono font-bold text-amber-100">
+                    Form T/351 Memo [{latestIncomingDemand?.worker_memo_code || latestIncomingDemand?.task_id}]
+                  </span>
+                </div>
+                <p className="text-sm font-extrabold text-white mt-1 truncate">
+                  Station: <span className="text-amber-200 underline font-black">{latestIncomingStation?.name} ({latestIncomingStationCode})</span> • Dept: <span className="text-amber-200">{latestIncomingDemand?.department}</span> • Range: <span className="text-amber-200">{latestIncomingDemand?.km_range}</span>
+                </p>
+                <p className="text-xs text-amber-100/90 font-medium">
+                  Section Controller Sanctioned • Requisitioned by {latestIncomingDemand?.submitter_name || `Field JE`} • {latestIncomingDemand?.duration_minutes}m Possession
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  if (latestIncomingStationCode && selectedStationCode !== 'ALL' && selectedStationCode !== latestIncomingStationCode) {
+                    setSelectedStationCode(latestIncomingStationCode);
+                  }
+                  const targetItem = stationBlocks.find((b) => b.id === latestIncomingDemand?.id || b.task_id === latestIncomingDemand?.task_id) || {
+                    id: latestIncomingDemand?.id,
+                    block_id: latestIncomingDemand?.sanctioned_block_id || `BLK-${latestIncomingStationCode}-${latestIncomingDemand?.task_id}`,
+                    section: latestIncomingDemand?.section || 'SBC-MYS',
+                    station: latestIncomingStationCode,
+                    km_range: latestIncomingDemand?.km_range,
+                    department: latestIncomingDemand?.department,
+                    work_description: latestIncomingDemand?.reason,
+                    scheduled_start: latestIncomingDemand?.scheduled_start || '01:30',
+                    scheduled_end: latestIncomingDemand?.scheduled_end || '03:30',
+                    duration_minutes: latestIncomingDemand?.duration_minutes || 120,
+                    worker_memo_code: latestIncomingDemand?.worker_memo_code || `MEMO-SWR-${latestIncomingStationCode}-2026-${latestIncomingDemand?.task_id}`,
+                    status: 'APPROVED',
+                    user_id: latestIncomingDemand?.user_id || '01',
+                    submitter_name: latestIncomingDemand?.submitter_name || 'Field JE',
+                    task_id: latestIncomingDemand?.task_id,
+                  };
+                  handleOpenMemo(targetItem as any);
+                }}
+                className="px-4 py-2.5 rounded-xl bg-white text-slate-950 hover:bg-amber-50 font-black text-xs shadow-lg transition-all transform hover:scale-[1.03] active:scale-[0.98] flex items-center space-x-1.5 cursor-pointer border border-white"
+              >
+                <FileText className="w-4 h-4 text-amber-700" />
+                <span>Review &amp; Issue Form T/351</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (latestIncomingStationCode && selectedStationCode !== 'ALL' && selectedStationCode !== latestIncomingStationCode) {
+                    setSelectedStationCode(latestIncomingStationCode);
+                  }
+                  const targetItem = stationBlocks.find((b) => b.id === latestIncomingDemand?.id || b.task_id === latestIncomingDemand?.task_id);
+                  handleOpenScan(targetItem || null);
+                }}
+                className="px-3.5 py-2.5 rounded-xl bg-black/40 hover:bg-black/60 text-white font-bold text-xs border border-white/40 transition-all flex items-center space-x-1.5 cursor-pointer"
+              >
+                <Camera className="w-4 h-4 text-amber-300" />
+                <span>Scan QR Permit</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Notification Toast */}
       {notification && (
@@ -2981,6 +3091,201 @@ export default function StationMasterPortalPage() {
               </div>
             )}
 
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 4. SEARCH ALL 159 KARNATAKA STATIONS MODAL                                */}
+      {/* ========================================================================= */}
+      {isStationSearchOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 font-sans">
+            {/* Modal Header */}
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#0F2D6B] text-white flex items-center justify-center">
+                  <MapPin className="w-4 h-4 text-amber-300" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 leading-tight">
+                    Search All 159 Karnataka Stations
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-mono">
+                    South Western Railway &amp; Konkan Railway Network
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsStationSearchOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="p-3 border-b border-slate-100 bg-white">
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="Type station code, name, division, or district (e.g. UBL, Hubballi, Mandya, Belagavi)..."
+                  value={stationSearchQuery}
+                  onChange={(e) => setStationSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0F2D6B] focus:bg-white transition"
+                />
+                {stationSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setStationSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Division Filter Pills */}
+              <div className="flex flex-wrap gap-1 mt-2.5">
+                {['ALL', 'Bengaluru', 'Mysuru', 'Hubballi', 'Konkan Railway', 'Kalaburagi', 'Guntakal'].map((div) => {
+                  const isSel = stationDivisionFilter === div;
+                  return (
+                    <button
+                      key={div}
+                      type="button"
+                      onClick={() => setStationDivisionFilter(div)}
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition cursor-pointer border ${
+                        isSel
+                          ? 'bg-[#0F2D6B] text-white border-[#0F2D6B]'
+                          : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                      }`}
+                    >
+                      {div === 'ALL' ? 'All (159)' : div}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Station List */}
+            <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+              {/* Universal Overview Option */}
+              <div
+                onClick={() => {
+                  setSelectedStationCode('ALL');
+                  setIsStationSearchOpen(false);
+                }}
+                className={`p-3 rounded-xl border flex items-center justify-between transition cursor-pointer ${
+                  selectedStationCode === 'ALL'
+                    ? 'bg-blue-50 border-[#0F2D6B] ring-1 ring-[#0F2D6B]'
+                    : 'bg-slate-50/70 border-slate-200 hover:bg-blue-50/50 hover:border-blue-300'
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 rounded-lg bg-[#0F2D6B] text-white flex items-center justify-center font-bold text-xs shrink-0">
+                    🌐
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-extrabold text-xs text-slate-900">
+                        ALL KARNATAKA STATIONS (Universal Overview)
+                      </span>
+                      <span className="px-1.5 py-0.2 rounded bg-blue-100 text-[#0F2D6B] font-mono text-[9px] font-bold">
+                        159 Stations
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500">
+                      Receives memos across all 12 SWR &amp; KRCL corridors simultaneously
+                    </p>
+                  </div>
+                </div>
+                {Object.values(stationMemoCounts).reduce((a, b) => a + b, 0) > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] shadow-2xs animate-pulse">
+                    ⚡ {Object.values(stationMemoCounts).reduce((a, b) => a + b, 0)} Memos Active
+                  </span>
+                )}
+              </div>
+
+              {/* Filtered 159 Station Items */}
+              {KARNATAKA_STATIONS.filter((s) => {
+                if (stationDivisionFilter !== 'ALL') {
+                  if (stationDivisionFilter === 'Konkan Railway') {
+                    if (!s.division?.includes('Konkan')) return false;
+                  } else if (s.division !== stationDivisionFilter) {
+                    return false;
+                  }
+                }
+                if (stationSearchQuery.trim()) {
+                  const q = stationSearchQuery.toLowerCase().trim();
+                  return (
+                    s.code.toLowerCase().includes(q) ||
+                    s.name.toLowerCase().includes(q) ||
+                    s.fullName.toLowerCase().includes(q) ||
+                    s.division.toLowerCase().includes(q) ||
+                    (s.district && s.district.toLowerCase().includes(q))
+                  );
+                }
+                return true;
+              }).map((stn) => {
+                const count = stationMemoCounts[stn.code] || 0;
+                const isSelected = selectedStationCode === stn.code;
+
+                return (
+                  <div
+                    key={stn.code}
+                    onClick={() => {
+                      setSelectedStationCode(stn.code);
+                      setIsStationSearchOpen(false);
+                      playAlertChime('info');
+                    }}
+                    className={`p-2.5 rounded-xl border flex items-center justify-between transition cursor-pointer ${
+                      isSelected
+                        ? 'bg-blue-50 border-[#0F2D6B] ring-1 ring-[#0F2D6B]'
+                        : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2.5 min-w-0">
+                      <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center font-mono font-black text-xs text-[#0F2D6B] shrink-0">
+                        {stn.code}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center space-x-1.5 truncate">
+                          <span className="font-bold text-xs text-slate-900 truncate">{stn.name}</span>
+                          <span className="text-[10px] font-mono text-slate-500 shrink-0">({stn.km})</span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 font-sans truncate">
+                          {stn.division} Division • {stn.district || stn.section} • {stn.platforms || 2} PFs • Max {stn.line_speed || 110} km/h
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2 shrink-0">
+                      {count > 0 && (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] shadow-2xs animate-pulse">
+                          ⚡ {count} {count === 1 ? 'Memo' : 'Memos'}
+                        </span>
+                      )}
+                      <ChevronRight className="w-4 h-4 text-slate-400" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-[11px] font-mono text-slate-500">
+              <span>Showing 159 Stations in Karnataka Digital Twin</span>
+              <button
+                type="button"
+                onClick={() => setIsStationSearchOpen(false)}
+                className="px-3 py-1 rounded-lg bg-white border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
